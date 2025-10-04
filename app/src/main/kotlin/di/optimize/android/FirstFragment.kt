@@ -19,6 +19,7 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import org.osmdroid.views.CustomZoomButtonsController
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
@@ -70,7 +71,7 @@ class FirstFragment : Fragment() {
         map.setTileSource(TileSourceFactory.MAPNIK)
         map.setTilesScaledToDpi(true)
         map.setMultiTouchControls(true)
-        map.setBuiltInZoomControls(true)
+        map.zoomController.setVisibility(CustomZoomButtonsController.Visibility.ALWAYS)
 
         val controller = map.controller
         controller.setZoom(16.0)
@@ -97,34 +98,64 @@ class FirstFragment : Fragment() {
             val address = "Øvre Movei 23, 1450 Nesodden"
             val geoUri = Uri.parse("geo:0,0?q=" + Uri.encode(address))
 
-            // 1) Try Google Maps explicitly
+            // 1) Try Google Maps explicitly (component)
             try {
                 val mapsIntent = Intent(Intent.ACTION_VIEW, geoUri).apply {
                     setPackage("com.google.android.apps.maps")
                 }
+                Toast.makeText(requireContext(), "Åpner Google Maps-appen", Toast.LENGTH_SHORT).show()
                 startActivity(mapsIntent)
                 return@setOnClickListener
             } catch (e: Exception) {
                 // Ignore and try implicit
             }
 
-            // 2) Try any app that can handle geo: VIEW
+            // 2) Try any app that can handle geo: VIEW (component)
             try {
                 val anyMapIntent = Intent(Intent.ACTION_VIEW, geoUri)
+                Toast.makeText(requireContext(), "Åpner kartapp", Toast.LENGTH_SHORT).show()
                 startActivity(anyMapIntent)
                 return@setOnClickListener
             } catch (e: Exception) {
                 // Ignore and try HTTP fallback
             }
 
-            // 3) Final fallback: open in a browser
+            // 3) Final fallback: open in a browser (web)
             try {
                 val httpUri = Uri.parse("https://www.google.com/maps/search/?api=1&query=" + Uri.encode(address))
+                Toast.makeText(requireContext(), "Åpner i nettleser", Toast.LENGTH_SHORT).show()
                 startActivity(Intent(Intent.ACTION_VIEW, httpUri))
             } catch (e: Exception) {
                 Toast.makeText(requireContext(), "Kunne ikke åpne kartapp eller nettleser", Toast.LENGTH_SHORT).show()
             }
         }
+
+        // --- THIS IS THE NEW CODE TO ADD ---
+        binding.fabAddItem.setOnClickListener {    // Get the user's current location from the map overlay
+            val currentLocation = myLocationOverlay?.myLocation
+            if (currentLocation != null) {
+                // 1. Create a message with the coordinates
+                val text = "Nytt element lagt til på: ${String.format("%.5f, %.5f", currentLocation.latitude, currentLocation.longitude)}"
+                Toast.makeText(requireContext(), text, Toast.LENGTH_LONG).show()
+
+                // 2. Create a new marker for the map
+                val newMarker = Marker(binding.osmMapView).apply {
+                    position = GeoPoint(currentLocation.latitude, currentLocation.longitude)
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    title = "Nytt element"
+                }
+
+                // 3. Add the new marker to the map and redraw it
+                binding.osmMapView.overlays.add(newMarker)
+                binding.osmMapView.invalidate()
+
+            } else {
+                // Show a message if location is not yet available
+                Toast.makeText(requireContext(), "Finner ikke nåværende posisjon", Toast.LENGTH_SHORT).show()
+            }
+        }
+// --- END OF NEW CODE ---
+
     }
 
     private fun hasLocationPermission(): Boolean {
