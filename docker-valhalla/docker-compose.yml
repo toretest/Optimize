@@ -1,0 +1,25 @@
+services:
+  valhalla:
+    image: ghcr.io/valhalla/valhalla:latest
+    container_name: valhalla
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./valhalla:/data
+    command: >
+      bash -lc "
+      set -e;
+      if [ ! -f /data/valhalla.json ]; then
+        echo 'Creating config...';
+        valhalla_build_config --mjolnir-tile-dir /data/valhalla_tiles --mjolnir-tile-extract /data/valhalla_tiles.tar > /data/valhalla.json;
+      fi;
+      if [ ! -d /data/valhalla_tiles ]; then
+        echo 'Building tiles...';
+        valhalla_build_tiles -c /data/valhalla.json /data/osm/norway-latest.osm.pbf;
+        valhalla_add_predicted_traffic -c /data/valhalla.json || true;
+        valhalla_build_admins -c /data/valhalla.json || true;
+        valhalla_build_timezones -c /data/valhalla.json || true;
+        tar -C /data -cf /data/valhalla_tiles.tar valhalla_tiles;
+      fi;
+      echo 'Starting service...';
+      valhalla_service /data/valhalla.json 1"
